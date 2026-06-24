@@ -3,6 +3,9 @@ import dotenv from 'dotenv';
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
+import dns from 'dns';
+
+dns.setDefaultResultOrder('ipv4first');
 
 dotenv.config();
 
