@@ -91,6 +91,11 @@ const adminAuth = (req, res, next) => {
 //             Public Endpoints
 // ==========================================
 
+// Root endpoint to check API status
+app.get('/', (req, res) => {
+  res.json({ status: 'success', message: 'Shivohara Backend API is running successfully.' });
+});
+
 // Get all active job postings
 app.get('/api/jobs', async (req, res) => {
   try {
