@@ -3,11 +3,10 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
+const isLocalhost = process.env.DATABASE_URL && (process.env.DATABASE_URL.includes('localhost') || process.env.DATABASE_URL.includes('127.0.0.1'));
 const pool = new pg.Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: {
-    rejectUnauthorized: false
-  }
+  ssl: isLocalhost ? false : { rejectUnauthorized: false }
 });
 
 const seedJobs = async () => {
@@ -16,45 +15,71 @@ const seedJobs = async () => {
     client = await pool.connect();
     console.log('Connected to database. Seeding jobs...');
 
-    // First check if jobs table already has data to prevent duplicate seed entries
-    const checkResult = await client.query('SELECT COUNT(*) FROM jobs;');
+    // 1. Delete specific mock jobs
+    await client.query(`
+      DELETE FROM jobs 
+      WHERE description = 'VCUDCVUDUT' 
+         OR (title = 'Full Stack Engineer' AND location LIKE '%Virginia%')
+         OR (title = 'AI / Machine Learning Specialist' AND location LIKE '%Virginia%')
+         OR (title = 'Software Engineer Intern' AND location = 'Remote' AND salary = '$25 - $35 / hour');
+    `);
+
+    // 2. Check if the new realistic jobs are already present
+    const checkResult = await client.query(`
+      SELECT COUNT(*) FROM jobs WHERE title IN (
+        'AI/ML Integration Specialist',
+        'Senior Frontend Engineer',
+        'Software Engineer (Node.js/PostgreSQL)',
+        'UI/UX Design Intern'
+      );
+    `);
     const count = parseInt(checkResult.rows[0].count, 10);
     
     if (count > 0) {
-      console.log(`The database already has ${count} job listings. Skipping seeding to prevent duplicates.`);
+      console.log(`The database already has ${count} matching job listings. Skipping seeding.`);
       return;
     }
 
     const jobs = [
       {
-        title: 'Full Stack Engineer',
-        department: 'Engineering',
+        title: 'AI/ML Integration Specialist',
+        department: 'AI Engineering',
         type: 'Full-time',
-        location: 'Virginia (US East) / Remote',
-        salary: '$100,000 - $130,000',
-        description: 'We are looking for a Full Stack Engineer to join our core team. You will build and scale sleek web portals, SaaS consoles, and high-performance APIs.',
-        requirements: '3+ years experience with React, Node.js, and PostgreSQL.\nExperience with cloud platforms like Render or AWS.\nStrong communication and problem-solving skills.',
-        responsibilities: 'Collaborate with designers to implement premium user interfaces.\nOptimize database queries and API response times.\nWrite clean, reusable, and tested code.',
+        location: 'Bangalore (On-site / Hybrid)',
+        salary: '₹12L - ₹18L / annum',
+        description: 'We are looking for an AI/ML Integration Specialist to design, build, and deploy agentic AI features, retrieval pipelines, and vector database structures. You will work on cutting-edge neural interfaces and coordinate with our frontend team to implement premium cognitive interactions.',
+        requirements: '2+ years of experience with Python, PyTorch, and generative AI APIs (OpenAI, Gemini).\nExperience with LangChain, LangGraph, or custom multi-agent orchestration frameworks.\nStrong hands-on experience with vector databases (Pinecone, PGVector, ChromaDB).\nUnderstanding of LLM fine-tuning and retrieval-augmented generation (RAG) pipelines.',
+        responsibilities: 'Build and optimize backend vector pipeline workflows for agent operations.\nIntegrate agentic workflows into our client-facing SaaS platforms and applications.\nResearch, deploy, and benchmark foundational models for niche industry use-cases.\nOptimize database queries and AI agent latency.'
       },
       {
-        title: 'AI / Machine Learning Specialist',
-        department: 'AI & Data Science Lab',
+        title: 'Senior Frontend Engineer',
+        department: 'Engineering',
         type: 'Full-time',
-        location: 'Virginia (US East) / Remote',
-        salary: '$120,000 - $150,000',
-        description: 'Join our AI Lab to build cognitive agent workflows, custom LLM fine-tunes, and advanced predictive data pipelines.',
-        requirements: 'Strong background in Python, PyTorch, or TensorFlow.\nExperience fine-tuning Open Source LLMs (Llama, Mistral).\nExperience with vector databases.',
-        responsibilities: 'Design and deploy custom neural network architectures.\nIntegrate agentic workflows into client SaaS platforms.\nWork closely with data engineers to optimize pipeline throughput.',
+        location: 'Bangalore (On-site / Hybrid)',
+        salary: '₹10L - ₹15L / annum',
+        description: 'Join our engineering team to build premium, highly-interactive web portals, SaaS consoles, and fluid user experiences. You will lead the client-side engineering for our next-generation digital products.',
+        requirements: '4+ years of professional software engineering experience.\nExpertise in React, Vite, CSS/SCSS, and modern client-side state management.\nStrong eye for typography, layout spacing, glassmorphism, and premium micro-interactions.\nExperience optimizing Core Web Vitals (LCP, INP, CLS) and responsive design.',
+        responsibilities: 'Architect, build, and optimize high-fidelity, responsive user interfaces.\nCollaborate closely with UI/UX designers to translate Figma layouts into interactive realities.\nEstablish frontend coding standards and maintain reusable component libraries.\nMentor junior developers and participate in code reviews.'
       },
       {
-        title: 'Software Engineer Intern',
+        title: 'Software Engineer (Node.js/PostgreSQL)',
         department: 'Engineering',
+        type: 'Full-time',
+        location: 'Bangalore (On-site / Hybrid)',
+        salary: '₹8L - ₹12L / annum',
+        description: 'We are seeking a Backend-focused Software Engineer to design, implement, and maintain scalable APIs, server architectures, and database tables.',
+        requirements: '3+ years experience with Node.js, Express, and PostgreSQL.\nDeep understanding of RESTful API design, database schemas, and SQL query optimization.\nFamiliarity with secure authentication protocols (JWT, OAuth) and CORS configurations.\nExperience with deployment pipelines and cloud infrastructure (Render, AWS).',
+        responsibilities: 'Design robust database schemas and write efficient SQL queries.\nDevelop, test, and document RESTful backend APIs.\nEnsure deep infrastructure security, data integrity, and error handling.\nCollaborate with frontend engineers to integrate user-facing features.'
+      },
+      {
+        title: 'UI/UX Design Intern',
+        department: 'Design',
         type: 'Internship',
-        location: 'Remote',
-        salary: '$25 - $35 / hour',
-        description: 'Kickstart your engineering career by working alongside senior mentors on real production software.',
-        requirements: 'Basic proficiency in Javascript, HTML, and CSS.\nFamiliarity with Git and relational databases.\nEager to learn and receive feedback.',
-        responsibilities: 'Assist in building and testing new backend API endpoints.\nFix minor UI bugs and write unit tests.\nParticipate in daily standup and code reviews.',
+        location: 'Bangalore / Hybrid',
+        salary: '₹25,000 - ₹35,000 / month',
+        description: 'Kickstart your career in product design by working alongside senior mentors and developers to craft stunning, user-centric visual experiences.',
+        requirements: 'Proficiency in Figma and standard design prototyping tools.\nA solid understanding of visual hierarchy, typography, colors, and layout spacing.\nEager to learn, receive feedback, and collaborate in a fast-paced environment.\nA portfolio showcasing clean web or mobile UI/UX design concepts.',
+        responsibilities: 'Design intuitive, premium user interfaces, wireframes, and prototypes.\nAssist in establishing and maintaining our agency\'s design tokens and styling systems.\nCollaborate with engineers to ensure design fidelity during frontend development.'
       }
     ];
 
