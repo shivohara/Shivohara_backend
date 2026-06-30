@@ -12,10 +12,14 @@ dotenv.config();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Create mock-emails directory for development logging
+// Create mock-emails directory for development logging (bypassed on Vercel's read-only filesystem)
 const mockEmailsDir = path.join(__dirname, 'mock-emails');
-if (!fs.existsSync(mockEmailsDir)) {
-  fs.mkdirSync(mockEmailsDir, { recursive: true });
+try {
+  if (!fs.existsSync(mockEmailsDir) && !process.env.VERCEL) {
+    fs.mkdirSync(mockEmailsDir, { recursive: true });
+  }
+} catch (err) {
+  console.warn('Could not create mock-emails directory (read-only filesystem):', err.message);
 }
 
 // Get the company logo file path
@@ -91,11 +95,17 @@ const getTransporter = () => {
 };
 
 const saveMockEmail = (to, subject, html) => {
-  const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-  const fileName = `email-${to}-${timestamp}.html`;
-  const filePath = path.join(mockEmailsDir, fileName);
-  fs.writeFileSync(filePath, `<!-- Subject: ${subject} -->\n<!-- To: ${to} -->\n\n${html}`);
-  console.log(`[MOCK EMAIL SENT] Saved email file to: ${filePath}`);
+  try {
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const fileName = `email-${to}-${timestamp}.html`;
+    const targetDir = process.env.VERCEL ? '/tmp' : mockEmailsDir;
+    const filePath = path.join(targetDir, fileName);
+    fs.writeFileSync(filePath, `<!-- Subject: ${subject} -->\n<!-- To: ${to} -->\n\n${html}`);
+    console.log(`[MOCK EMAIL SENT] Saved email file to: ${filePath}`);
+  } catch (err) {
+    console.error('Failed to write mock email file:', err.message);
+    console.log(`[MOCK EMAIL DATA] To: ${to} | Subject: ${subject}`);
+  }
 };
 
 const sendEmail = async ({ to, subject, html, text, attachments }) => {
