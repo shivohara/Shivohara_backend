@@ -429,7 +429,7 @@ app.use((err, req, res, next) => {
 
 // On Vercel, we export the app. For local/other servers, we start the listener.
 if (process.env.VERCEL) {
-  runMigrations().catch(err => console.error('Migration failed during Vercel startup:', err));
+  console.log('Running on Vercel. Database migrations bypassed on function boot.');
 } else {
   startServer();
 }
