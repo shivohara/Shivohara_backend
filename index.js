@@ -93,7 +93,7 @@ app.get('/', (req, res) => {
 app.get('/api/jobs', async (req, res) => {
   try {
     const result = await pool.query(
-      'SELECT id, title, department, type, location, salary, description, requirements, responsibilities, created_at FROM jobs WHERE status = $1 ORDER BY created_at DESC',
+      'SELECT id, title, department, type, location, salary, description, requirements, responsibilities, skills, deadline, deadline_completed, created_at FROM jobs WHERE status = $1 ORDER BY created_at DESC',
       ['Active']
     );
     res.json(result.rows);
@@ -209,7 +209,7 @@ app.get('/api/admin/jobs', adminAuth, async (req, res) => {
 
 // Admin: Create a new job listing
 app.post('/api/admin/jobs', adminAuth, async (req, res) => {
-  const { title, department, type, location, salary, description, requirements, responsibilities, status } = req.body;
+  const { title, department, type, location, salary, description, requirements, responsibilities, status, skills, deadline, deadline_completed } = req.body;
 
   if (!title || !department || !type || !location || !description || !requirements || !responsibilities) {
     return res.status(400).json({ error: 'Missing required fields for creating a job.' });
@@ -217,8 +217,21 @@ app.post('/api/admin/jobs', adminAuth, async (req, res) => {
 
   try {
     const result = await pool.query(
-      'INSERT INTO jobs (title, department, type, location, salary, description, requirements, responsibilities, status) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *',
-      [title, department, type, location, salary || '', description, requirements, responsibilities, status || 'Active']
+      'INSERT INTO jobs (title, department, type, location, salary, description, requirements, responsibilities, status, skills, deadline, deadline_completed) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING *',
+      [
+        title, 
+        department, 
+        type, 
+        location, 
+        salary || '', 
+        description, 
+        requirements, 
+        responsibilities, 
+        status || 'Active',
+        skills || '',
+        deadline || '',
+        deadline_completed !== undefined ? deadline_completed : false
+      ]
     );
     res.status(201).json(result.rows[0]);
   } catch (err) {
@@ -230,7 +243,7 @@ app.post('/api/admin/jobs', adminAuth, async (req, res) => {
 // Admin: Update a job listing
 app.put('/api/admin/jobs/:id', adminAuth, async (req, res) => {
   const id = parseInt(req.params.id, 10);
-  const { title, department, type, location, salary, description, requirements, responsibilities, status } = req.body;
+  const { title, department, type, location, salary, description, requirements, responsibilities, status, skills, deadline, deadline_completed } = req.body;
 
   if (!title || !department || !type || !location || !description || !requirements || !responsibilities) {
     return res.status(400).json({ error: 'Missing required fields for updating job.' });
@@ -238,8 +251,22 @@ app.put('/api/admin/jobs/:id', adminAuth, async (req, res) => {
 
   try {
     const result = await pool.query(
-      'UPDATE jobs SET title = $1, department = $2, type = $3, location = $4, salary = $5, description = $6, requirements = $7, responsibilities = $8, status = $9 WHERE id = $10 RETURNING *',
-      [title, department, type, location, salary || '', description, requirements, responsibilities, status || 'Active', id]
+      'UPDATE jobs SET title = $1, department = $2, type = $3, location = $4, salary = $5, description = $6, requirements = $7, responsibilities = $8, status = $9, skills = $10, deadline = $11, deadline_completed = $12 WHERE id = $13 RETURNING *',
+      [
+        title, 
+        department, 
+        type, 
+        location, 
+        salary || '', 
+        description, 
+        requirements, 
+        responsibilities, 
+        status || 'Active',
+        skills || '',
+        deadline || '',
+        deadline_completed !== undefined ? deadline_completed : false,
+        id
+      ]
     );
 
     if (result.rows.length === 0) {

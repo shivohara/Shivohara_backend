@@ -29,9 +29,19 @@ const runMigrations = async () => {
         description TEXT NOT NULL,
         requirements TEXT NOT NULL,
         responsibilities TEXT NOT NULL,
+        skills TEXT DEFAULT '',
+        deadline VARCHAR(100) DEFAULT '',
+        deadline_completed BOOLEAN DEFAULT FALSE,
         status VARCHAR(20) DEFAULT 'Active',
         created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
+    `);
+
+    // Ensure new columns exist on existing databases
+    await client.query(`
+      ALTER TABLE jobs ADD COLUMN IF NOT EXISTS skills TEXT DEFAULT '';
+      ALTER TABLE jobs ADD COLUMN IF NOT EXISTS deadline VARCHAR(100) DEFAULT '';
+      ALTER TABLE jobs ADD COLUMN IF NOT EXISTS deadline_completed BOOLEAN DEFAULT FALSE;
     `);
     
     // Create applications table
