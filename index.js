@@ -6,6 +6,7 @@ import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
+import { put } from '@vercel/blob';
 import {
   sendApplicationReceivedEmail,
   sendShortlistedEmail,
@@ -25,16 +26,8 @@ if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true });
 }
 
-// Multer storage engine configuration
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, uploadDir);
-  },
-  filename: (req, file, cb) => {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
-    cb(null, uniqueSuffix + '-' + file.originalname);
-  }
-});
+// Multer storage in memory so it works with Vercel serverless and local fallback
+const storage = multer.memoryStorage();
 
 const upload = multer({
   storage: storage,
@@ -120,24 +113,32 @@ app.post('/api/jobs/:id/apply', upload.single('resume'), async (req, res) => {
   }
 
   if (!name || !email) {
-    if (req.file) {
-      fs.unlink(req.file.path, () => {});
-    }
     return res.status(400).json({ error: 'Name and email are required.' });
   }
-
-  const resume_url = `/uploads/${req.file.filename}`;
 
   try {
     // Validate if the job exists and is active
     const jobCheck = await pool.query('SELECT id, title FROM jobs WHERE id = $1 AND status = $2', [job_id, 'Active']);
     if (jobCheck.rows.length === 0) {
-      if (req.file) {
-        fs.unlink(req.file.path, () => {});
-      }
       return res.status(404).json({ error: 'Active job listing not found.' });
     }
     const job = jobCheck.rows[0];
+
+    let resume_url;
+    if (process.env.BLOB_READ_WRITE_TOKEN) {
+      const uniqueFilename = `${Date.now()}-${req.file.originalname}`;
+      const blob = await put(`resumes/${uniqueFilename}`, req.file.buffer, {
+        access: 'public',
+        contentType: req.file.mimetype,
+      });
+      resume_url = blob.url;
+    } else {
+      // Fallback: save locally
+      const uniqueFilename = `${Date.now()}-${req.file.originalname}`;
+      const localPath = path.join(uploadDir, uniqueFilename);
+      await fs.promises.writeFile(localPath, req.file.buffer);
+      resume_url = `/uploads/${uniqueFilename}`;
+    }
 
     const result = await pool.query(
       'INSERT INTO applications (job_id, name, email, portfolio_url, resume_text, cover_letter) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
@@ -149,17 +150,9 @@ app.post('/api/jobs/:id/apply', upload.single('resume'), async (req, res) => {
       console.error('Error sending application received email:', err);
     });
 
-    // Admin notification email suppressed per user request
-
-
     res.status(201).json({ success: true, application: result.rows[0] });
   } catch (err) {
     console.error('Error submitting application:', err);
-    if (req.file) {
-      fs.unlink(req.file.path, (unlinkErr) => {
-        if (unlinkErr) console.error('Error deleting orphaned resume file:', unlinkErr);
-      });
-    }
     res.status(500).json({ error: 'Internal Server Error' });
   }
 });
@@ -407,4 +400,11 @@ app.use((err, req, res, next) => {
   res.status(400).json({ error: err.message || 'An unexpected error occurred.' });
 });
 
-startServer();
+// On Vercel, we export the app. For local/other servers, we start the listener.
+if (process.env.VERCEL) {
+  runMigrations().catch(err => console.error('Migration failed during Vercel startup:', err));
+} else {
+  startServer();
+}
+
+export default app;
