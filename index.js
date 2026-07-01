@@ -145,10 +145,12 @@ app.post('/api/jobs/:id/apply', upload.single('resume'), async (req, res) => {
       [job_id, name, email, portfolio_url || '', resume_url, cover_letter || '']
     );
 
-    // Send confirmation email asynchronously (do not block client response)
-    sendApplicationReceivedEmail(email, name, job.title).catch(err => {
+    // Send confirmation email (awaited to ensure it completes in serverless environments)
+    try {
+      await sendApplicationReceivedEmail(email, name, job.title);
+    } catch (err) {
       console.error('Error sending application received email:', err);
-    });
+    }
 
     res.status(201).json({ success: true, application: result.rows[0] });
   } catch (err) {
@@ -353,13 +355,17 @@ app.put('/api/admin/applications/:id/status', adminAuth, async (req, res) => {
     if (appDetailsCheck.rows.length > 0) {
       const details = appDetailsCheck.rows[0];
       if (status === 'Shortlisted') {
-        sendShortlistedEmail(details.email, details.name, details.job_title).catch(err => {
+        try {
+          await sendShortlistedEmail(details.email, details.name, details.job_title);
+        } catch (err) {
           console.error('Error sending shortlisted email:', err);
-        });
+        }
       } else if (status === 'Rejected') {
-        sendRegretEmail(details.email, details.name, details.job_title).catch(err => {
+        try {
+          await sendRegretEmail(details.email, details.name, details.job_title);
+        } catch (err) {
           console.error('Error sending regret email:', err);
-        });
+        }
       }
     }
 
