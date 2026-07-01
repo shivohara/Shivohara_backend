@@ -20,9 +20,9 @@ dotenv.config();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Create uploads directory if it doesn't exist
-const uploadDir = path.join(__dirname, 'uploads');
-if (!fs.existsSync(uploadDir)) {
+// Create uploads directory if it doesn't exist (bypassed on Vercel's read-only filesystem)
+const uploadDir = process.env.VERCEL ? '/tmp' : path.join(__dirname, 'uploads');
+if (!process.env.VERCEL && !fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true });
 }
 
@@ -153,7 +153,7 @@ app.post('/api/jobs/:id/apply', upload.single('resume'), async (req, res) => {
     res.status(201).json({ success: true, application: result.rows[0] });
   } catch (err) {
     console.error('Error submitting application:', err);
-    res.status(500).json({ error: 'Internal Server Error' });
+    res.status(500).json({ error: err.message || 'Internal Server Error' });
   }
 });
 
